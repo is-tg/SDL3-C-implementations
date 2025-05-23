@@ -5,14 +5,11 @@
 
 #define WINDOW_WIDTH 960
 #define WINDOW_HEIGHT 540
-#define LOAD_SHADER(filename, sizeptr) SDL_LoadFile("shaders\\" filename, sizeptr)
 
 typedef struct {
     SDL_Window *window;
-    SDL_GPUDevice *device;
-    SDL_GPUBuffer *vertexBuffer;
-    SDL_GPUTransferBuffer *transferBuffer;
-    SDL_GPUGraphicsPipeline *graphicsPipeline;
+    SDL_Renderer *renderer;
+    SDL_Texture *texture;
 } AppState;
 
 #endif // !MAIN_H
