@@ -1,0 +1,47 @@
+name: Build SDL3 Project
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Install SDL3 dependencies (Ubuntu)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt update
+        sudo apt install libsdl3-dev build-essential cmake ninja-build
+
+    - name: Install SDL3 dependencies (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        brew install sdl3 cmake ninja
+
+    - name: Install SDL3 dependencies (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System'
+        choco install ninja
+        # Assume SDL3 is vendored or statically linked, otherwise you'd have to provide/find a Windows-compatible build
+
+    - name: Create build directory
+      run: cmake -E make_directory build
+
+    - name: Configure CMake
+      run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build
+      run: cmake --build build
+
