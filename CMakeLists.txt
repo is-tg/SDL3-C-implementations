@@ -1,9 +1,21 @@
 cmake_minimum_required(VERSION 3.20)
+project(SDL3_Project)
 
-project(hello)
-find_package(SDL3)
+# Manually set paths since we don't have SDL3Config.cmake
+include_directories("C:/Users/Tharun/Documents/SDL3-x64-2025-05-18/SDL3-x64/include")
+link_directories("C:/Users/Tharun/Documents/SDL3-x64-2025-05-18/SDL3-x64/lib")
 
+# Gather source files
 file(GLOB SOURCES "src/*.c")
-add_executable(app ${SOURCES}) # WIN32 - hide the console like this add_executable(app WIN32)
 
-target_link_libraries(app PRIVATE SDL3::SDL3)
+# Create executable
+add_executable(app ${SOURCES}) # WIN32 hides the console
+
+# Link SDL3 dynamically
+target_link_libraries(app PRIVATE SDL3)
+
+# Ensure the SDL3.dll is available at runtime
+set_target_properties(app PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
+

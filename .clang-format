@@ -1,0 +1,5 @@
+BasedOnStyle: WebKit
+SortIncludes: false
+PointerAlignment: Right
+InsertNewlineAtEOF: true
+
