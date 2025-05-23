@@ -5,7 +5,7 @@
 
 #define WINDOW_WIDTH 960
 #define WINDOW_HEIGHT 540
-#define LOAD_SHADER(filename, sizeptr) SDL_LoadFile("C:\\Users\\Tharun\\Documents\\projects\\solar-sim\\shaders\\" filename, sizeptr)
+#define LOAD_SHADER(filename, sizeptr) SDL_LoadFile("shaders\\" filename, sizeptr)
 
 typedef struct {
     SDL_Window *window;
