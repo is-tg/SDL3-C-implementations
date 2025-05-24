@@ -16,7 +16,7 @@ static int frameCount = 0;
 static float fps = 0;
 static Uint64 then = 0;
 
-static bool start = false;
+static bool paused = true;
 static bool clicked = false;
 static int score = 0;
 static int highscore = 0;
@@ -49,8 +49,8 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 {
     switch (event->type) {
     case SDL_EVENT_MOUSE_BUTTON_UP:
-        if (!start) {
-            start = true;
+        if (paused) {
+            paused = false;
             hitCircle.birth = SDL_GetTicks();
         }
         clicked = true;
@@ -79,8 +79,8 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     SDL_SetRenderDrawColor(as->renderer, RGBA(NAVY));
     SDL_RenderClear(as->renderer);
 
-    if (!start) {
-        const char *message = "CLICK TO START";
+    if (paused) {
+        const char *message = "CLICK TO PLAY!";
         SDL_SetRenderDrawColor(as->renderer, RGBA(0xFFFFFFFF));
 
         float scale = 6.0f;

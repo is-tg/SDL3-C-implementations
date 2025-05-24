@@ -14,7 +14,7 @@ link_directories("${SDL3_PATH}/lib")
 file(GLOB SOURCES "src/*.c")
 
 # Create executable
-add_executable(app ${SOURCES}) # WIN32 hides the console
+add_executable(app WIN32 ${SOURCES}) # WIN32 hides the console
 
 # Link SDL3 dynamically
 target_link_libraries(app PRIVATE SDL3)
