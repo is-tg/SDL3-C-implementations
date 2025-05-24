@@ -1,9 +1,14 @@
 cmake_minimum_required(VERSION 3.20)
 project(SDL3_Project)
 
-# Manually set paths since we don't have SDL3Config.cmake
-include_directories("C:/Users/Tharun/Documents/SDL3-x64-2025-05-18/SDL3-x64/include")
-link_directories("C:/Users/Tharun/Documents/SDL3-x64-2025-05-18/SDL3-x64/lib")
+if(NOT DEFINED ENV{SDL3_PATH})
+    message(FATAL_ERROR "Please set SDL3_PATH environment variable")
+endif()
+
+set(SDL3_PATH $ENV{SDL3_PATH})
+
+include_directories("${SDL3_PATH}/include")
+link_directories("${SDL3_PATH}/lib")
 
 # Gather source files
 file(GLOB SOURCES "src/*.c")
