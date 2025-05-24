@@ -1,0 +1,2 @@
+int WINDOW_WIDTH = 16 * 75;
+int WINDOW_HEIGHT = 9 * 75;

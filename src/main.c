@@ -2,14 +2,10 @@
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL.h>
 #include "helper.h"
-
-#define NAVY 0x2A4759FF
-#define ORANGE 0xF79B72FF
-#define GREY 0xDDDDDDFF
-
-int W = 16 * 75,
-    H = 9 * 75;
-bool clicked = false;
+#include "circle.h"
+#include "render.h"
+#include "constants.h"
+#include "storage.h"
 
 typedef struct {
     SDL_Window *window;
@@ -17,20 +13,13 @@ typedef struct {
 } AppState;
 
 static int frameCount = 0;
+static float fps = 0;
 static Uint64 then = 0;
-int score = 0;
 
-#define InitialRadius 64
-#define InitialThickness 8
-
-struct {
-    float x, y, radius, thickness;
-    bool hit;
-} hitCircle = {
-    .radius = InitialRadius,
-    .thickness = InitialThickness,
-    .hit = false,
-};
+static bool start = false;
+static bool clicked = false;
+static int score = 0;
+static int highscore = 0;
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 {
@@ -45,121 +34,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     }
     *appstate = as;
 
-    if (!SDL_CreateWindowAndRenderer("osu!", W, H, SDL_WINDOW_RESIZABLE, &as->window, &as->renderer)) {
+    if (!SDL_CreateWindowAndRenderer("osu!", WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE, &as->window, &as->renderer)) {
         return SDL_Abort("Failed to create window/renderer");
     }
     SDL_SetRenderDrawBlendMode(as->renderer, SDL_BLENDMODE_BLEND);
 
-    hitCircle.x = W / 2.0f;
-    hitCircle.y = H / 2.0f;
-
-    return SDL_APP_CONTINUE;
-}
-
-#define MAX_CIRCLES 3
-#define SEGMENTS 64
-#define VERTS_PER_CIRCLE (SEGMENTS + 2)
-#define INDICES_PER_CIRCLE (SEGMENTS * 3)
-
-SDL_Vertex vertices[MAX_CIRCLES * VERTS_PER_CIRCLE];
-int indices[MAX_CIRCLES * INDICES_PER_CIRCLE];
-int vertCount = 0;
-int indexCount = 0;
-
-void add_circle(float cx, float cy, float radius, SDL_FColor color)
-{
-    int baseVert = vertCount;
-
-    // Center point
-    vertices[vertCount++] = (SDL_Vertex) {
-        .position = { cx, cy },
-        .color = color,
-        .tex_coord = { 0, 0 }
-    };
-
-    // Ring points
-    for (int i = 0; i <= SEGMENTS; ++i) {
-        float angle = (float)i / SEGMENTS * 2.0f * SDL_PI_F;
-        float x = cx + cosf(angle) * radius;
-        float y = cy + sinf(angle) * radius;
-
-        vertices[vertCount++] = (SDL_Vertex) {
-            .position = { x, y },
-            .color = color,
-            .tex_coord = { 0, 0 }
-        };
-
-        if (i == 0)
-            continue;
-        // Indices for triangle fan
-        indices[indexCount++] = baseVert; // center
-        indices[indexCount++] = baseVert + i; // current edge
-        indices[indexCount++] = baseVert + i + 1; // next edge
-    }
-}
-
-SDL_AppResult SDL_AppIterate(void *appstate)
-{
-    AppState *as = (AppState *)appstate;
-    SDL_SetRenderDrawColor(as->renderer, RGBA(NAVY));
-    SDL_RenderClear(as->renderer);
-
-    vertCount = 0;
-    indexCount = 0;
-
-    float mx, my;
-    SDL_GetMouseState(&mx, &my);
-    add_circle(mx, my, 8, (SDL_FColor)RGBA_F(0xFFFFFF55));
-
-    if (clicked) {
-        float distance = (mx - hitCircle.x) * (mx - hitCircle.x) + (my - hitCircle.y) * (my - hitCircle.y);
-        if (distance <= hitCircle.radius * hitCircle.radius) {
-            hitCircle.hit = true;
-            score++;
-        }
-        clicked = false;
-    }
-
-    if (hitCircle.hit) {
-        hitCircle.x = SDL_rand(W - 2 * InitialRadius) + InitialRadius, hitCircle.y = SDL_rand(H - 2 * InitialRadius) + InitialRadius;
-        hitCircle.radius = InitialRadius;
-        hitCircle.thickness = InitialThickness;
-        hitCircle.hit = false;
-    } else {
-        hitCircle.radius -= 0.4f;
-        hitCircle.thickness -= 0.05f;
-        if (hitCircle.radius <= 0) {
-            hitCircle.hit = true;
-        }
-    }
-    add_circle(hitCircle.x, hitCircle.y, hitCircle.radius, (SDL_FColor)RGBA_F(GREY));
-    add_circle(hitCircle.x, hitCircle.y, hitCircle.radius - hitCircle.thickness, (SDL_FColor)RGBA_F(ORANGE));
-
-    SDL_RenderGeometryRaw(
-        as->renderer,
-        NULL,
-        (float *)&vertices[0].position, sizeof(SDL_Vertex),
-        (SDL_FColor *)&vertices[0].color, sizeof(SDL_Vertex),
-        NULL, 0,
-        vertCount,
-        indices,
-        indexCount,
-        sizeof(int));
-
-    SDL_SetRenderDrawColor(as->renderer, RGBA(0xFFFFFFFF));
-    SDL_SetRenderScale(as->renderer, 2.0f, 2.0f);
-    SDL_RenderDebugTextFormat(as->renderer, 10, 10, "Score: %d", score);
-    SDL_SetRenderScale(as->renderer, 1.0f, 1.0f);
-    SDL_RenderPresent(as->renderer);
-
-    Uint64 now = SDL_GetTicks();
-    frameCount++;
-    if (now - then >= 1000) { // 1 second
-        float fps = frameCount * 1000.0f / (now - then);
-        SDL_Log("FPS: %.2f", fps);
-        then = now;
-        frameCount = 0;
-    }
+    circle_reset(&hitCircle);
+    LoadHighScore(&highscore);
 
     return SDL_APP_CONTINUE;
 }
@@ -168,10 +49,14 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 {
     switch (event->type) {
     case SDL_EVENT_MOUSE_BUTTON_UP:
+        if (!start) {
+            start = true;
+            hitCircle.birth = SDL_GetTicks();
+        }
         clicked = true;
         break;
     case SDL_EVENT_WINDOW_RESIZED:
-        SDL_GetWindowSize(((AppState *)appstate)->window, &W, &H);
+        SDL_GetWindowSize(((AppState *)appstate)->window, &WINDOW_WIDTH, &WINDOW_HEIGHT);
         break;
     case SDL_EVENT_QUIT:
         return SDL_APP_SUCCESS;
@@ -183,6 +68,82 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
         break;
     default:
         break;
+    }
+
+    return SDL_APP_CONTINUE;
+}
+
+SDL_AppResult SDL_AppIterate(void *appstate)
+{
+    AppState *as = (AppState *)appstate;
+    SDL_SetRenderDrawColor(as->renderer, RGBA(NAVY));
+    SDL_RenderClear(as->renderer);
+
+    if (!start) {
+        const char *message = "CLICK TO START";
+        SDL_SetRenderDrawColor(as->renderer, RGBA(0xFFFFFFFF));
+
+        float scale = 6.0f;
+        SDL_SetRenderScale(as->renderer, scale, scale);
+
+        // Approximate text width: 8 pixels per char, adjust as needed
+        float text_width = SDL_strlen(message) * 8.0f;
+        float text_height = 8.0f;
+
+        // Convert window size to scaled coordinates
+        float cx = (WINDOW_WIDTH / scale - text_width) / 2.0f;
+        float cy = (WINDOW_HEIGHT / scale - text_height) / 2.0f;
+
+        SDL_RenderDebugText(as->renderer, cx, cy, message);
+        SDL_SetRenderScale(as->renderer, 1.0f, 1.0f);
+        SDL_RenderPresent(as->renderer);
+        return SDL_APP_CONTINUE;
+    }
+
+    render_reset_buffers();
+
+    float mx, my;
+    SDL_GetMouseState(&mx, &my);
+    add_circle(mx, my, 8, (SDL_FColor)RGBA_F(0xFFFFFF55));
+
+    if (clicked) {
+        if (circle_is_hit(&hitCircle, mx, my)) {
+            hitCircle.state = CIRCLE_HIT;
+            score++;
+        }
+        clicked = false;
+    }
+
+    if (hitCircle.state == CIRCLE_DYING && hitCircle.radius <= 0) {
+        if (score > highscore) {
+            highscore = score;
+            SaveHighScore(highscore);
+        }
+        score = 0;
+        circle_reset(&hitCircle);
+    }
+
+    circle_update(&hitCircle);
+    add_circle(hitCircle.x, hitCircle.y, hitCircle.radius, (SDL_FColor) { RGB(GREY), hitCircle.color.a });
+    add_circle(hitCircle.x, hitCircle.y, hitCircle.radius - hitCircle.thickness, hitCircle.color);
+
+    flush_render(as->renderer);
+
+    SDL_SetRenderDrawColor(as->renderer, RGBA(0xFFFFFFFF));
+    SDL_SetRenderScale(as->renderer, 2.0f, 2.0f);
+    SDL_RenderDebugTextFormat(as->renderer, 10, 10, "HighScore: %d", highscore);
+    SDL_RenderDebugTextFormat(as->renderer, 10, 25, "Score: %d", score);
+    SDL_SetRenderScale(as->renderer, 1.0f, 1.0f);
+    SDL_RenderDebugTextFormat(as->renderer, 10, WINDOW_HEIGHT - 10, "FPS: %.2f", fps);
+
+    SDL_RenderPresent(as->renderer);
+
+    Uint64 now = SDL_GetTicks();
+    frameCount++;
+    if (now - then >= 1000) { // 1 second
+        fps = frameCount * 1000.0f / (now - then);
+        then = now;
+        frameCount = 0;
     }
 
     return SDL_APP_CONTINUE;
