@@ -1,1 +1,3 @@
-![screenshot](https://github.com/user-attachments/assets/ba75ba67-f31a-41da-982c-d92f6d8286eb)
+## Projects
+- [clicker game](https://github.com/is-tg/SDL3-C-implementations/tree/clicker_game)
+- [gpu triangle](https://github.com/is-tg/SDL3-C-implementations/tree/gpu_triangle)
