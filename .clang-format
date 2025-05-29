@@ -1,0 +1,11 @@
+﻿---
+AllowShortBlocksOnASingleLine: Never
+AlignAfterOpenBracket: BlockIndent
+BasedOnStyle: WebKit
+BinPackArguments: false
+BinPackParameters: false
+Cpp11BracedListStyle: true
+IndentWidth: 4
+PointerAlignment: Right
+SpaceAfterCStyleCast: true
+---
