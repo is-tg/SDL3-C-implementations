@@ -1,38 +1,37 @@
-cmake_minimum_required(VERSION 3.20)
-project(SDL3_Project)
+cmake_minimum_required(VERSION 3.24)
+project(MySDL3App C)
 
-# set the output directory for built objects.
-# This makes sure that the dynamic library goes into the build directory automatically.
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIGURATION>")
+include(FetchContent)
 
-if(NOT DEFINED ENV{SDL3_PATH})
-    message(FATAL_ERROR "Please set SDL3_PATH environment variable")
+# Fetch SDL3
+FetchContent_Declare(
+  SDL3
+  GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+  GIT_TAG release-3.2.14
+)
+FetchContent_MakeAvailable(SDL3)
+
+# Collect all source files in src/
+file(GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS src/*.c)
+
+# Add your executable
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+add_executable(app ${SRC_FILES})
+
+# Enable all warnings
+if (CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+    target_compile_options(app PRIVATE -Wall -Wextra -Wpedantic -Wconversion -Wshadow -Wstrict-prototypes -Werror)
+elseif (CMAKE_C_COMPILER_ID STREQUAL "MSVC")
+    target_compile_options(app PRIVATE /W4 /WX)
 endif()
 
-set(SDL3_PATH $ENV{SDL3_PATH})
+# Link with SDL3
+target_link_libraries(app PRIVATE SDL3::SDL3)
 
-include_directories("${SDL3_PATH}/include")
-link_directories("${SDL3_PATH}/lib")
-
-# on Web targets, we need CMake to generate a HTML webpage. 
-# if(EMSCRIPTEN)
-#   set(CMAKE_EXECUTABLE_SUFFIX ".html" CACHE INTERNAL "")
-# endif()
-
-# Gather source files
-file(GLOB SOURCES "src/*.c")
-
-# Create executable
-add_executable(app WIN32 ${SOURCES}) # WIN32 hides the console
-
-# Link SDL3 dynamically
-target_link_libraries(app PRIVATE SDL3)
-
-# Place built executable in bin subdirectory
-set_target_properties(app PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
-)
-
-file(COPY "${SDL3_PATH}/bin/SDL3.dll"
-     DESTINATION "${CMAKE_BINARY_DIR}/bin")
+if(WIN32)
+    add_custom_command(
+        TARGET app POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E copy $<TARGET_FILE:SDL3::SDL3-shared> $<TARGET_FILE_DIR:app>
+        VERBATIM
+    )
+endif()
