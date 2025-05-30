@@ -7,5 +7,6 @@ BinPackParameters: false
 Cpp11BracedListStyle: true
 IndentWidth: 4
 PointerAlignment: Right
+SortIncludes: false
 SpaceAfterCStyleCast: true
 ---

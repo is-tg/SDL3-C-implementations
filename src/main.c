@@ -1,14 +1,10 @@
 #define SDL_MAIN_USE_CALLBACKS
-#include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
+#include <SDL3/SDL.h>
+#include "linalg.h"
 
 #define ASPECT_RATIO_FACTOR 75
-#define WINDOW_WIDTH 16 * ASPECT_RATIO_FACTOR
-#define WINDOW_HEIGHT 9 * ASPECT_RATIO_FACTOR
-
-#define NAVY 0x2A4759
-#define ORANGE 0xF79B72
-#define GREY 0xDDDDDD
+#define DARK 0x1A1A1D
 
 typedef struct {
     SDL_Window *window;
@@ -16,9 +12,13 @@ typedef struct {
     SDL_GPUGraphicsPipeline *pipeline;
 } AppState;
 
-SDL_FColor color(Uint32 hex, float alpha);
+struct {
+    matrix4 projection;
+} ubo;
+
+SDL_FColor RGBA_F(Uint32 hex, float alpha);
 SDL_AppResult SDL_Abort(const char *report);
-SDL_GPUShader *LoadShader(SDL_GPUDevice *device, const char *file, SDL_GPUShaderStage stage);
+SDL_GPUShader *LoadShader(SDL_GPUDevice *device, const char *file, SDL_GPUShaderStage stage, Uint32 num_uniform_buffers);
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 {
@@ -37,7 +37,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     }
     *appstate = as;
 
-    as->window = SDL_CreateWindow("title", WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE);
+    as->window = SDL_CreateWindow("title", 16 * ASPECT_RATIO_FACTOR, 9 * ASPECT_RATIO_FACTOR, SDL_WINDOW_RESIZABLE);
     if (!as->window) {
         return SDL_Abort("Couldn't create window");
     }
@@ -51,8 +51,8 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
         return SDL_Abort("Couldn't claim window for gpu device");
     }
 
-    SDL_GPUShader *vertex_shader = LoadShader(as->gpu, "shader.spv.vert", SDL_GPU_SHADERSTAGE_VERTEX);
-    SDL_GPUShader *fragment_shader = LoadShader(as->gpu, "shader.spv.frag", SDL_GPU_SHADERSTAGE_FRAGMENT);
+    SDL_GPUShader *vertex_shader = LoadShader(as->gpu, "shader.spv.vert", SDL_GPU_SHADERSTAGE_VERTEX, 1);
+    SDL_GPUShader *fragment_shader = LoadShader(as->gpu, "shader.spv.frag", SDL_GPU_SHADERSTAGE_FRAGMENT, 0);
 
     SDL_GPUGraphicsPipelineCreateInfo pipeline_createinfo = {
         .vertex_shader = vertex_shader,
@@ -69,6 +69,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 
     SDL_ReleaseGPUShader(as->gpu, vertex_shader);
     SDL_ReleaseGPUShader(as->gpu, fragment_shader);
+
+    int w, h;
+    SDL_GetWindowSize(as->window, &w, &h);
+    ubo.projection = matrix4_perspective(70, (float) w / (float) h, 0.0001f, 1000.0f);
 
     return SDL_APP_CONTINUE;
 }
@@ -105,12 +109,13 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     if (swapchain_tex) {
         SDL_GPUColorTargetInfo color_target = {
             .texture = swapchain_tex,
-            .clear_color = color(NAVY, 1.0f),
+            .clear_color = RGBA_F(DARK, 1.0f),
             .load_op = SDL_GPU_LOADOP_CLEAR,
             .store_op = SDL_GPU_STOREOP_STORE,
         };
         SDL_GPURenderPass *render_pass = SDL_BeginGPURenderPass(cmd_buf, &color_target, 1, NULL);
         SDL_BindGPUGraphicsPipeline(render_pass, as->pipeline);
+        SDL_PushGPUVertexUniformData(cmd_buf, 0, &ubo, sizeof(ubo));
 
         SDL_DrawGPUPrimitives(render_pass, 3, 1, 0, 0);
 
@@ -133,7 +138,7 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     }
 }
 
-SDL_FColor color(Uint32 hex, float alpha)
+SDL_FColor RGBA_F(Uint32 hex, float alpha)
 {
     return (SDL_FColor) {
         ((hex >> 16) & 0xFF) / 255.0f,
@@ -143,7 +148,7 @@ SDL_FColor color(Uint32 hex, float alpha)
     };
 }
 
-SDL_GPUShader *LoadShader(SDL_GPUDevice *device, const char *file, SDL_GPUShaderStage stage)
+SDL_GPUShader *LoadShader(SDL_GPUDevice *device, const char *file, SDL_GPUShaderStage stage, Uint32 num_uniform_buffers)
 {
     size_t codesize;
     void *code = SDL_LoadFile(file, &codesize);
@@ -156,7 +161,7 @@ SDL_GPUShader *LoadShader(SDL_GPUDevice *device, const char *file, SDL_GPUShader
         .entrypoint = "main",
         .format = SDL_GPU_SHADERFORMAT_SPIRV,
         .stage = stage,
-
+        .num_uniform_buffers = num_uniform_buffers,
     };
     SDL_GPUShader *shader = SDL_CreateGPUShader(device, &shader_createinfo);
     SDL_free(code);
