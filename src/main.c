@@ -13,7 +13,13 @@ typedef struct {
 } AppState;
 
 struct {
-    matrix4 projection;
+    Uint64 last_ticks;
+    Uint64 new_ticks;
+    float delta_time;
+} time;
+
+struct {
+    matrix4 mvp;
 } ubo;
 
 SDL_FColor RGBA_F(Uint32 hex, float alpha);
@@ -72,7 +78,11 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 
     int w, h;
     SDL_GetWindowSize(as->window, &w, &h);
-    ubo.projection = matrix4_perspective(70, (float) w / (float) h, 0.0001f, 1000.0f);
+    matrix4 projection = matrix4_perspective(SDL_PI_F * 60 / 180, (float) w / (float) h, 0.0001f, 1000.0f);
+    matrix4 translation = matrix4_translate(0, 0, -5);
+    ubo.mvp = matrix4_multiply(&projection, &translation);
+
+    time.last_ticks = SDL_GetTicks();
 
     return SDL_APP_CONTINUE;
 }
@@ -97,6 +107,9 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 SDL_AppResult SDL_AppIterate(void *appstate)
 {
     AppState *as = (AppState *) appstate;
+    time.new_ticks = SDL_GetTicks();
+    time.delta_time = (float) (time.new_ticks - time.last_ticks) / 1000.0f;
+    time.last_ticks = time.new_ticks;
 
     SDL_GPUCommandBuffer *cmd_buf = SDL_AcquireGPUCommandBuffer(as->gpu);
     if (!cmd_buf) {
@@ -105,6 +118,9 @@ SDL_AppResult SDL_AppIterate(void *appstate)
 
     SDL_GPUTexture *swapchain_tex;
     SDL_WaitAndAcquireGPUSwapchainTexture(cmd_buf, as->window, &swapchain_tex, NULL, NULL);
+
+    matrix4 rotation = matrix4_rotate(SDL_PI_F / 2 * time.delta_time, 0, 1, 0);
+    ubo.mvp = matrix4_multiply(&ubo.mvp, &rotation);
 
     if (swapchain_tex) {
         SDL_GPUColorTargetInfo color_target = {
